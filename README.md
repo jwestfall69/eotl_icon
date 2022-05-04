@@ -9,6 +9,7 @@ It has the following differences from the origin plugin
   * Rewritten in new style sourcepawn syntax
   * Adds config file to support numerous different icons
   * Allows each VIP to have their own icon defined (in the database)
+  * Allow executing commands for an icon when its enabled/disabled
   * Removed some unneeded features
 
 
