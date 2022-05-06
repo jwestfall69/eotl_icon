@@ -6,7 +6,7 @@
 #include <sdkhooks>
 
 #define PLUGIN_AUTHOR  "ack"
-#define PLUGIN_VERSION "0.07"
+#define PLUGIN_VERSION "0.08"
 
 #define CONFIG_FILE    "configs/eotl_icon.cfg"
 
@@ -151,14 +151,19 @@ public Action EventRoundEnd(Handle event, const char[] name, bool dontBroadcast)
 
     LogDebug("round ended, creating icons for donators");
     for(int client = 1; client <= MaxClients; client++) {
+
+        if(!IsClientInGame(client)) {
+            continue;
+
+        }
         if(IsFakeClient(client)) {
             continue;
         }
 
-        if(!IsClientInGame(client) || !IsPlayerAlive(client)) {
+        if(!IsPlayerAlive(client)) {
             continue;
-
         }
+
         if(!g_playerStates[client].isDonator) {
             continue;
         }
