@@ -1,17 +1,16 @@
 # eotl_icon
 
-This is a TF2 sourcemod plugin.
+This is a TF2 sourcemod plugin I wrote for the [EOTL](https://www.endofthelinegaming.com/) community.
 
 This plugin will put an icon/sprite above vip players that are alive when a round ends.  Its based off the [donator recognition](https://forums.alliedmods.net/showthread.php?p=1128547) plugin.
 
 It has the following differences from the origin plugin
 
-  * Rewritten in new style sourcepawn syntax
+  * Rewritten in new style sourcemod syntax
   * Adds config file to support numerous different icons
   * Allows each VIP to have their own icon defined (in the database)
   * Allow executing commands for an icon when its enabled/disabled
   * Removed some unneeded features
-
 
 ### Dependencies
 <hr>
