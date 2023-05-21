@@ -3,7 +3,7 @@
 
 #include <sourcemod>
 #include <sdktools>
-#include <sdkhooks>
+//#include <sdkhooks>
 
 #define PLUGIN_AUTHOR  "ack"
 #define PLUGIN_VERSION "0.08"
@@ -38,7 +38,7 @@ ConVar g_cvDebug;
 public Plugin myinfo = {
 	name = "eotl_icon",
 	author = PLUGIN_AUTHOR,
-	description = "Display icon over donators head at end of round",
+	description = "Display icon over vip's head at end of round",
 	version = PLUGIN_VERSION,
 	url = ""
 };
