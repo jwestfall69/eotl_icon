@@ -4,27 +4,19 @@
 #include <sourcemod>
 #include <sdktools>
 //#include <sdkhooks>
+#include "../eotl_vip_core/eotl_vip_core.inc"
 
 #define PLUGIN_AUTHOR  "ack"
-#define PLUGIN_VERSION "0.08"
+#define PLUGIN_VERSION "2.01"
 
 #define CONFIG_FILE    "configs/eotl_icon.cfg"
-
-#define DB_CONFIG      "default"
-#define DB_TABLE       "vip_users"
-#define DB_COL_ICONID  "iconID"
-#define DB_COL_STEAMID "steamID"
-
-#define ICONID_MAX_LEN  32
 #define CMD_MAX_LEN     128
 
 //#define USE_SDKHOOK
 
 enum struct PlayerState {
-    bool isDonator;
     bool iconActive;
     int iconEntRef;
-    char iconID[ICONID_MAX_LEN];
 }
 
 PlayerState g_playerStates[MAXPLAYERS + 1];
@@ -44,7 +36,7 @@ public Plugin myinfo = {
 };
 
 public void OnPluginStart() {
-    LogMessage("version %s starting (db config: %s, table: %s)", PLUGIN_VERSION, DB_CONFIG, DB_TABLE);
+    LogMessage("version %s starting", PLUGIN_VERSION);
     g_cvDebug = CreateConVar("eotl_icon_debug", "0", "0/1 enable debug output", FCVAR_NONE, true, 0.0, true, 1.0);
 
 #if defined USE_SDKHOOK
@@ -56,19 +48,13 @@ public void OnPluginStart() {
 
 public void OnMapStart() {
 
-    LoadConfig();
-
-    if(!ConnectDB()) {
-        LogError("will re-attempt database connection when a client connects");
-    }
-
     g_roundOver = false;
+    LoadConfig();
 
     for (int client = 1; client <= MaxClients; client++) {
         g_playerStates[client].iconEntRef = -1;
         g_playerStates[client].iconActive = false;
-        g_playerStates[client].isDonator = false;
-	}
+    }
 
     HookEvent("teamplay_round_start", EventRoundStart, EventHookMode_PostNoCopy);
 
@@ -89,27 +75,13 @@ public void OnMapEnd() {
     CloseHandle(auxRemoveCmdMap);
 }
 
-public void OnClientAuthorized(int client, const char[] auth) {
-
-    if(IsFakeClient(client)) {
-        return;
-    }
-
-    if(InitClient(client, auth, true)) {
-        LogMessage("client: %d, %N (%s) is a donator, iconID: %s", client, client, auth, g_playerStates[client].iconID);
-    } else {
-        LogMessage("client: %d, %N (%s) is not a donator", client, client, auth);
-    }
-}
-
 public void OnClientDisconnect(int client) {
 
-    LogDebug("client: %d disconnected", client);
+    LogDebug("client: %N disconnected", client);
 
     if(g_playerStates[client].iconActive) {
         RemoveIcon(client);
     }
-    g_playerStates[client].isDonator = false;
 }
 
 public Action EventPlayerDeath(Handle event, const char[] name, bool dontBroadcast) {
@@ -133,8 +105,14 @@ public Action EventRoundStart(Handle event, const char[] name, bool dontBroadcas
         if(g_playerStates[client].iconActive) {
             RemoveIcon(client);
 
+            char iconID[EOTL_ICONID_MAX_LENGTH];
+            if(!EotlGetClientVipIcon(client, iconID, sizeof(iconID))) {
+                LogError("client: %N is a vip, but doesn't have an icon setup!?", client);
+                continue;
+            }
+
             char cmd[CMD_MAX_LEN];
-            if(GetTrieString(auxRemoveCmdMap, g_playerStates[client].iconID, cmd, sizeof(cmd))) {
+            if(GetTrieString(auxRemoveCmdMap, iconID, cmd, sizeof(cmd))) {
                 runCommand(client, cmd);
             }
         }
@@ -164,7 +142,7 @@ public Action EventRoundEnd(Handle event, const char[] name, bool dontBroadcast)
             continue;
         }
 
-        if(!g_playerStates[client].isDonator) {
+        if(!EotlIsClientVip(client)) {
             continue;
         }
 
@@ -232,9 +210,15 @@ void AddIcon(int client) {
 
     char targetName[32];
     char vmt[128];
+    char iconID[EOTL_ICONID_MAX_LENGTH];
 
-    if(!GetTrieString(iconMap, g_playerStates[client].iconID, vmt, sizeof(vmt))) {
-        LogError("client: %d has iconID %s but that doesn't exist in our iconMap trie!? skipping", client, g_playerStates[client].iconID);
+    if(!EotlGetClientVipIcon(client, iconID, sizeof(iconID))) {
+        LogError("client: %N is a vip, but doesn't have an icon setup!?", client);
+        return;
+    }
+
+    if(!GetTrieString(iconMap, iconID, vmt, sizeof(vmt))) {
+        LogError("client: %d has iconID %s but that doesn't exist in our iconMap trie!? skipping", client, iconID);
         return;
     }
 
@@ -256,10 +240,10 @@ void AddIcon(int client) {
     g_playerStates[client].iconEntRef = EntIndexToEntRef(icon);
     g_playerStates[client].iconActive = true;
 
-    LogDebug("client: %d icon added (iconID: %s, entity: %d, ref: %d) ", client, g_playerStates[client].iconID, icon, g_playerStates[client].iconEntRef);
+    LogDebug("client: %d icon added (iconID: %s, entity: %d, ref: %d) ", client, iconID, icon, g_playerStates[client].iconEntRef);
 
     char cmd[CMD_MAX_LEN];
-    if(GetTrieString(auxAddCmdMap, g_playerStates[client].iconID, cmd, sizeof(cmd))) {
+    if(GetTrieString(auxAddCmdMap, iconID, cmd, sizeof(cmd))) {
         runCommand(client, cmd);
     }
 
@@ -281,74 +265,6 @@ void RemoveIcon(int client) {
     }
     g_playerStates[client].iconActive = false;
     g_playerStates[client].iconEntRef = -1;
-}
-
-bool ConnectDB() {
-    if(!SQL_CheckConfig(DB_CONFIG)) {
-        SetFailState("Database config \"%s\" doesn't exist", DB_CONFIG);
-    }
-
-    char error[256];
-    g_dbh = SQL_Connect(DB_CONFIG, false, error, sizeof(error));
-    if(g_dbh == INVALID_HANDLE) {
-        LogError("connection to database failed (DB config: %s): %s", DB_CONFIG, error);
-        return false;
-    }
-
-    LogMessage("connected to database");
-    return true;
-}
-
-bool InitClient(int client, const char[] steamid, bool retryDB) {
-
-    g_playerStates[client].isDonator = false;
-    g_playerStates[client].iconActive = false;
-    g_playerStates[client].iconEntRef = -1;
-    strcopy(g_playerStates[client].iconID, ICONID_MAX_LEN, "");
-
-    if(g_dbh == INVALID_HANDLE) {
-        LogError("InitClient() not connected to database, attempting reconnect");
-        if(!ConnectDB()) {
-            LogError("client: %d InitClient() still no connection to database, disabling icon for them", client);
-            return false;
-        }
-        return InitClient(client, steamid, false);
-    }
-
-    char query[128];
-    Format(query, sizeof(query), "SELECT %s from %s where %s = '%s'", DB_COL_ICONID, DB_TABLE, DB_COL_STEAMID, steamid);
-
-    DBResultSet results;
-    results = SQL_Query(g_dbh, query);
-
-    // this seems to be an indication we aren't connected to the database anymore
-    if(results == INVALID_HANDLE) {
-        CloseHandle(g_dbh);
-        g_dbh = INVALID_HANDLE;
-        if(retryDB) {
-            return InitClient(client, steamid, false);
-        }
-        LogError("client: %d InitClient() SQL_Query returned INVALID_HANDLE. Something maybe wrong with the connection to the database. disabling icon for them");
-        return false;
-    }
-
-    if(results.RowCount > 0) {
-        char iconID[32];
-        char junk[1];
-        if(results.FetchRow()) {
-            if(results.FetchString(0, iconID, sizeof(iconID))) {
-                if(GetTrieString(iconMap, iconID, junk, 0)) {
-                    strcopy(g_playerStates[client].iconID, ICONID_MAX_LEN, iconID);
-                    g_playerStates[client].isDonator = true;
-                } else {
-                    LogError("client: %d (streamid: %s) has iconID: %s in the database, but that iconID doesn't exist in the config, disabling icon for them", client, steamid, iconID);
-                }
-            }
-        }
-    }
-
-    CloseHandle(results);
-    return g_playerStates[client].isDonator;
 }
 
 void LoadConfig() {

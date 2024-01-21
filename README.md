@@ -15,15 +15,7 @@ It has the following differences from the origin plugin
 ### Dependencies
 <hr>
 
-**Database**<br>
-
-This plugin is expecting the following to exist (hardcoded as its what we need)
-
-* Database config named 'default'
-* Table on that database named 'vip_users'
-* Columns in that table named 'streamID' and 'iconID'
-
-This information provides the plugin with a list of VIP's and their associated icon.
+This plugin depends on eotl_vip_core plugin.
 
 ### Config File (addons/sourcemod/configs/eotl_icon.cfg)
 <hr>
